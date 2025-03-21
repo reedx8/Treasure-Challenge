@@ -1,7 +1,9 @@
 /*
-4 diffferent phases:
+5 diffferent phases:
+0. traversal algo
 1. tower finder algo (search algo -- bfs)
-2. save tower location
+    - save tower location
+2. find shortest path to tower
 3. collect blocks algo (search algo)
 4. build staircase algo
 
