@@ -1,15 +1,16 @@
 /*
-5 diffferent phases:
-0. traversal algo
-1. tower finder algo (search algo -- bfs)
-    - save tower location
-2. find shortest path to tower
-3. collect blocks algo (search algo)
-4. build staircase algo
+3 main algos to find:
+1. traversal algo (done)
+    - needs backtracking too (done)
+    - save tower location (done)
+2. collect blocks algo (can just pop off path[] for now) 
+3. build staircase algo
+    - align ((h-1)(h))/2  blocks in total (where h = tower height)
 
-- Each run has several journeys
-- Each journey has its own list of 'path' blocks, hence `path` set clears routinely (eg tower found, black added to staircase, etc, are all different individual journies within a single run)
+
+- Each run has several paths created -- path[] cleared each time troll at tower
 - explored is a list of all explored cells in run, never to be reset in a single run. 
+- Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
 */
 
 import { Action } from './lib/Action';
@@ -40,13 +41,8 @@ interface MyCell {
 }
 
 class Stacker {
-    private treasureFound = false; // if we have found the treasure on map
-    // private treasureLocation: { x: number; y: number; level: number } | null;
+    private treasureFound = false; // if we have found the treasure on map (not used)
     private towerLocation: MyCell | null = null; // x,y location of tower on map
-
-    // private collectedBlocks = 0; // the block we have currently in hand, to build the staircase
-    // private requiredBlocks = 0;
-    // private buildingStaircase = false;
     private holdingBlock = false; // if we are holding a block
     private explored: MyCell[] | null = []; // list of all cells visited in journey/path, never removed (using set would probably be better lookup time if ever needed)
     private current: MyCell | null = null; // current x,y position on map
@@ -55,23 +51,21 @@ class Stacker {
         inProgress: false,
     };
 
-    // Keep track of the path we're following
-    // private pathToFollow: Action[] = [];
+    // using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
+    // private staircaseTotal = Math.abs((8 - 1) * 8) / 2; // (not used to keep simple) total number of blocks required to build staircase
+    private staircaseTotal = 3; // dummy value for now (to keep it simple)
 
-    // For BFS/DFS traversal
+    // For BFS/DFS traversal and backtracking
     private path: MyCell[] = []; // The path actually taken thus far for each journey/run (using set would probably be better lookup time if needed)
-    // private visited = new Set<string>();
     private toVisit: MyCell[] = []; // list of cells to visit next
-    // private toVisit: { x: number; y: number; path: Action[] }[] = []; // list of cells to visit immediately in (x,y,path) format
-    // private doneVisiting = false; // not used
 
     turn = (cell: CellInfo): Action => {
-        // Greedy pickup
         if (
             cell.type === CellType.BLOCK &&
             !this.holdingBlock &&
             !this.towerLocation // TODO: should be able to pick up block when tower is found too obv, but avoids never-ending pickup/drop loop at end for now
         ) {
+            // Greedy pickup
             this.holdingBlock = true;
             console.log('PICKUP');
             return Action.PICKUP;
@@ -110,6 +104,11 @@ class Stacker {
                 console.log('DROP');
                 this.holdingBlock = false;
             }
+
+            // TODO
+            // this.path = []; // reset path
+            // this.toVisit = []; // reset toVisit
+            // return this.traverseMap(cell); // traverse map again
 
             // TODO: needs to drop only under certain conditions
             return Action.DROP; // 2nd drop: placeholder for now (stays in place while dropping too)
@@ -246,14 +245,14 @@ class Stacker {
             // down: +1y
             return Action.DOWN;
         } else {
-            // x=0 and y=0 when visited all cells on map
+            // TODO: x=0 and y=0 when visited all cells on map
             // this.toVisit.pop();
             // this.doneVisiting = true;
             // return Action.PICKUP; // placeholder for now , stays in place
         }
     }
 
-    // add to explored and path cells if not already in there
+    // add to explored and path list if not already in there
     private updatePath(position: MyCell): void {
         if (
             !this.explored.some((e) => e.x === position.x && e.y === position.y)
@@ -263,44 +262,12 @@ class Stacker {
         if (!this.path.some((e) => e.x === position.x && e.y === position.y)) {
             this.path.push({ ...position });
         }
-
         // console.log('current: ' + this.current.x + ',' + this.current.y);
-
-        // Update the explored set
-        // const key = `${this.currentPosition.x},${this.currentPosition.y}`;
-        // this.explored.add(key);
-
-        // Check for blocks in the surrounding cells
-        // const neighbors = [
-        //     { dir: 'left', dx: -1, dy: 0 }, // dx = left/right direction, dy = up/down direction
-        //     { dir: 'up', dx: 0, dy: -1 },
-        //     { dir: 'right', dx: 1, dy: 0 },
-        //     { dir: 'down', dx: 0, dy: 1 },
-        // ];
-
-        // for (const neighbor of neighbors) {
-        //     const neighborCell = cell[neighbor.dir as keyof CellInfo] as {
-        //         type: CellType;
-        //         level: number;
-        //     };
-
-        //     // collect location of blocks on map to improve performance?
-        //     if (neighborCell.type === CellType.BLOCK) {
-        //         const blockX = this.currentPosition.x + neighbor.dx;
-        //         const blockY = this.currentPosition.y + neighbor.dy;
-        //         const blockKey = `${blockX},${blockY}`; // TODO: not used yet
-
-        //         // Add to known blocks if not already there
-        //         if (this.knownBlocks.has(blockKey)) {
-        //             this.knownBlocks.add(blockKey);
-        //         }
-        //     }
-        // }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
 
-    // Check if cell is valid to move to (if not wall, not already visited in path, and 1 level away)
+    // Find which neighbors are valid to move to (if not wall, not already visited in path, and 1 level away)
     private isValidCell(
         cell: CellInfo, // current cell
         direction: { type: CellType; level: number },
@@ -326,12 +293,6 @@ class Stacker {
         return false;
         // TODO: what about for CellType.GOLD?
     }
-
-    // TODO: calculate required number of blocks to collect for building staircase (not used)
-    private calculateRequiredBlocks(level: number): number {
-        // using the triangular number formula: (n-1)n/2
-        return Math.floor(((level - 1) * level) / 2);
-    }
 }
 
 // Add Stacker to the global window object for use in the challenge.js file
@@ -342,223 +303,3 @@ declare global {
 }
 
 window.Stacker = Stacker;
-
-// TODO: Helper methods for different phases
-// private exploreAction(cell: CellInfo): Action {
-//     // Logic for exploration (BFS)
-//     if (this.toVisit.length === 0) {
-//         // if just starting...
-//         this.toVisit.push({
-//             x: this.currentPosition.x,
-//             y: this.currentPosition.y,
-//             path: [],
-//         });
-//         this.path.clear(); // DNU: shouldnt need this if just beginning, so this coudl be used when we are at the target perhaps or some other condition when toVisit is empty
-//         this.path.add(
-//             `${this.currentPosition.x},${this.currentPosition.y}`
-//         );
-//     }
-//     // process next cell in BFS queue if cells stil to visit
-//     while (this.toVisit.length > 0) {
-//         const current = this.toVisit.shift(); // makes array/list a queue by using shift
-
-//         // DNU: follow the path if at target (ie exit and follow path instead of exploring?)
-//         if (
-//             current.x === this.currentPosition.x &&
-//             current.y === this.currentPosition.y &&
-//             current.path.length > 0
-//         ) {
-//             this.pathToFollow = [...current.path];
-//             return this.pathToFollow.shift();
-//         }
-
-//         // check all neighbors
-//         const directions = [
-//             { action: Action.LEFT, dx: -1, dy: 0, cell: cell.left },
-//             { action: Action.RIGHT, dx: 1, dy: 0, cell: cell.right },
-//             { action: Action.UP, dx: 0, dy: -1, cell: cell.up },
-//             { action: Action.DOWN, dx: 0, dy: 1, cell: cell.down },
-//         ];
-
-//         for (const dir of directions) {
-//             if (
-//                 dir.cell.type !== CellType.WALL &&
-//                 Math.abs(dir.cell.level - cell.level) <= 1
-//             ) {
-//                 const newX = current.x + dir.dx;
-//                 const newY = current.y + dir.dy;
-//                 const key = `${newX},${newY}`;
-
-//                 // if not path, add to toVisit queue. Main way to traverse the map here
-//                 if (!this.path.has(key)) {
-//                     this.path.add(key);
-//                     this.toVisit.push({
-//                         x: newX,
-//                         y: newY,
-//                         path: [...current.path, dir.action], // DNU
-//                     });
-//                 }
-//             }
-//         }
-//     }
-
-//     // if no path found, take a random valid move
-//     const validMoves = [];
-//     if (
-//         cell.left.type !== CellType.WALL &&
-//         Math.abs(cell.left.level - cell.level) <= 1
-//     ) {
-//         validMoves.push(Action.LEFT);
-//     }
-//     if (
-//         cell.right.type !== CellType.WALL &&
-//         Math.abs(cell.right.level - cell.level) <= 1
-//     ) {
-//         validMoves.push(Action.RIGHT);
-//     }
-//     if (
-//         cell.up.type !== CellType.WALL &&
-//         Math.abs(cell.up.level - cell.level) <= 1
-//     ) {
-//         validMoves.push(Action.UP);
-//     }
-//     if (
-//         cell.down.type !== CellType.WALL &&
-//         Math.abs(cell.down.level - cell.level) <= 1
-//     ) {
-//         validMoves.push(Action.DOWN);
-//     }
-
-//     if (validMoves.length > 0) {
-//         return validMoves[Math.floor(Math.random() * validMoves.length)];
-//     }
-
-//     // shouldnt happen with BFS, but fallback nonetheless
-//     return Action.LEFT;
-// }
-
-// Logic for collecting blocks
-// private collectBlocksAction(cell: CellInfo): Action {
-//     // pick up block if on it and return an Action
-//     if (cell.type === CellType.BLOCK) {
-//         ++this.collectedBlocks;
-//         return Action.PICKUP;
-//     }
-
-//     // if we have a target block, follow the path to it
-//     if (this.targetBlock === null) {
-//         // find nearest block
-//         if (this.knownBlocks.length > 0) {
-//             this.targetBlock = this.knownBlocks.shift();
-
-//             // Calculate path to target block using BFS
-//             this.toVisit = [
-//                 {
-//                     x: this.currentPosition.x,
-//                     y: this.currentPosition.y,
-//                     path: [],
-//                 },
-//             ];
-//             this.path.clear();
-//             this.path.add(
-//                 `${this.currentPosition.x},${this.currentPosition.y}`
-//             );
-
-//             // BFS to find path to target block
-//             while (this.toVisit.length > 0) {
-//                 const current = this.toVisit.shift();
-
-//                 // if (current.x === this.targetBlock.x && current.y === this.targetBlock.y && current.path.length > 0) {
-//                 if (
-//                     current.x === this.targetBlock.x &&
-//                     current.y === this.targetBlock.y
-//                 ) {
-//                     this.pathToFollow = [...current.path];
-//                     break;
-//                 }
-
-//                 // check ALL neighbors from current cell (simulation of movement)
-//                 const directions = [
-//                     { action: Action.LEFT, dx: -1, dy: 0 },
-//                     { action: Action.RIGHT, dx: 1, dy: 0 },
-//                     { action: Action.UP, dx: 0, dy: -1 },
-//                     { action: Action.DOWN, dx: 0, dy: 1 },
-//                 ];
-
-//                 for (const dir of directions) {
-//                     const newX = current.x + dir.dx;
-//                     const newY = current.y + dir.dy;
-//                     const key = `${newX},${newY}`;
-
-//                     if (!this.path.has(key)) {
-//                         this.path.add(key);
-//                         this.toVisit.push({
-//                             x: newX,
-//                             y: newY,
-//                             path: [...current.path, dir.action],
-//                         });
-//                     }
-//                 }
-//             }
-//             if (this.pathToFollow.length > 0) {
-//                 return this.pathToFollow.shift()!;
-//             }
-//         }
-//     }
-
-//     // continue exploring to find blocks
-//     return this.exploreAction(cell);
-// }
-
-// Logic for building staircase
-// private buildStaircaseAction(cell: CellInfo): Action {
-//     // find start of staircase start point if not there
-//     if (this.staircaseStart === null) {
-//         this.staircaseStart = { ...this.currentPosition }; // x,y,level
-//         this.staircaseBuilt = 0;
-//     }
-
-//     // if path to follow, continue following it
-//     if (this.pathToFollow.length > 0) {
-//         return this.pathToFollow.shift()!;
-//     }
-
-//     // if were at the right position to build the next stair
-//     if (this.staircaseBuilt < this.treasureLocation!.level) {
-//         // drop block to build stair
-//         if (this.collectedBlocks > 0) {
-//             --this.collectedBlocks;
-//             ++this.staircaseBuilt;
-//             return Action.DROP;
-//         }
-//     }
-
-//     // if weve built all the stairs needed, try to reach the treasure
-//     if (this.staircaseBuilt === this.treasureLocation!.level) {
-//         // if were at the treasure, weve won/done
-//         if (cell.type === CellType.GOLD) {
-//             this.treasureFound = true;
-//             return Action.PICKUP;
-//         }
-
-//         // simplified -- doesnt handle complex terrain where you might need to
-//         // navigate around obstracles, etc, hence should use BFS
-//         const directions = [
-//             { action: Action.LEFT, dx: -1, dy: 0, cell: cell.left },
-//             { action: Action.RIGHT, dx: 1, dy: 0, cell: cell.right },
-//             { action: Action.UP, dx: 0, dy: -1, cell: cell.up },
-//             { action: Action.DOWN, dx: 0, dy: 1, cell: cell.down },
-//         ];
-
-//         for (const dir of directions) {
-//             if (
-//                 dir.cell.type == CellType.GOLD &&
-//                 Math.abs(dir.cell.level - cell.level) <= 1
-//             ) {
-//                 return dir.action;
-//             }
-//         }
-//     }
-//     // fallback -- explore to find more blocks or better position
-//     return this.exploreAction(cell);
-// }
