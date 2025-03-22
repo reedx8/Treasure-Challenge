@@ -12,7 +12,6 @@
 - explored is a list of all explored cells in run, never to be reset in a single run. 
 - Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
 */
-
 import { Action } from './lib/Action';
 import { CellType } from './lib/CellType';
 
@@ -24,14 +23,6 @@ interface CellInfo {
     type: CellType; // the type for the current cell
     level: number; // the level of the current cell
 }
-
-// interface Backtrack {
-//     inProgress: boolean; // backtracking currently in progress
-//     left?: number; // go left x turns, right x turns, etc... (not used)
-//     right?: number;
-//     up?: number;
-//     down?: number;
-// }
 
 // To create coordinate system -- unknown whether its ok to add to CellInfo instead
 interface MyCell {
@@ -47,10 +38,6 @@ class Stacker {
     private explored: MyCell[] | null = []; // list of all cells visited in journey/path, never removed (using set would probably be better lookup time if ever needed)
     private current: MyCell | null = null; // current x,y position on map
     private origin: MyCell = { x: 0, y: 0 }; // orogin cell of entire coordinate system
-    // private backtrack: Backtrack = {
-    //     inProgress: false,
-    // };
-    private backtrackInProgress = false; // if we are currently backtracking
 
     // using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
     // private staircaseTotal = Math.abs((8 - 1) * 8) / 2; // (not used to keep simple) total number of blocks required to build staircase
@@ -59,6 +46,7 @@ class Stacker {
     // For BFS/DFS traversal and backtracking
     private path: MyCell[] = []; // The path actually taken thus far for each journey/run (using set would probably be better lookup time if needed)
     private toVisit: MyCell[] = []; // list of cells to visit next
+    private backtrackInProgress = false; // if we are currently backtracking
 
     turn = (cell: CellInfo): Action => {
         if (
@@ -120,7 +108,7 @@ class Stacker {
         // Phase 4: Build staircase to treasure
     };
 
-    // traverse map by adding to toVisit (BFS?)
+    // Traverse map by adding to toVisit (DFS?)
     private traverseMap(cell: CellInfo): Action {
         // let traversedEntireMap = 4;
         let canMove = false;
@@ -175,6 +163,7 @@ class Stacker {
         // return this.getNextAction(); // DFS due to pop()?
     }
 
+    // Check if tower is found and update its location
     private findTower(
         direction: { type: CellType; level: number },
         dx: number,
@@ -188,7 +177,7 @@ class Stacker {
         }
     }
 
-    // Begin backtracking
+    // Begin backtracking if stuck for any reason
     private backtrackAction(): Action {
         this.backtrackInProgress = true;
         // x and y direction to backtrack to:
@@ -228,8 +217,8 @@ class Stacker {
         }
     }
 
+    // Derives next Action based on our coordinates (could remove this.origin since always 0):
     private getNextAction(): Action {
-        // derives next Action based on our coordinates (could remove origin since always 0):
         let x = this.origin.x - this.current.x + this.toVisit.slice(-1)[0].x; // last toVisit due to using pop()
         let y = this.origin.y - this.current.y + this.toVisit.slice(-1)[0].y;
 
@@ -253,7 +242,7 @@ class Stacker {
         }
     }
 
-    // add to explored and path list if not already in there
+    // Add to explored and path list if not already in there
     private updatePath(position: MyCell): void {
         if (
             !this.explored.some((e) => e.x === position.x && e.y === position.y)
@@ -265,8 +254,6 @@ class Stacker {
         }
         // console.log('current: ' + this.current.x + ',' + this.current.y);
     }
-
-    ////////////////////////////////////////////////////////////////////////////////////
 
     // Find which neighbors are valid to move to (if not wall, not already visited in path, and 1 level away)
     private isValidCell(
