@@ -1,4 +1,8 @@
 /*
+Program only capable of dropping a single block near found tower.
+Yet to collect additional blocks and build staircase.
+Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
+
 4 main algos to find:
 1. traversal algo (done)
     - save tower location (done)
@@ -9,7 +13,6 @@
 
 - Each run has several paths created -- path[] cleared each time troll at tower (TODO)
 - explored is a list of all explored cells in run, never to be reset in a single run. 
-- Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
 */
 import { Action } from './lib/Action';
 import { CellType } from './lib/CellType';
