@@ -25,13 +25,13 @@ interface CellInfo {
     level: number; // the level of the current cell
 }
 
-interface Backtrack {
-    inProgress: boolean; // backtracking currently in progress
-    left?: number; // go left x turns, right x turns, etc... (not used)
-    right?: number;
-    up?: number;
-    down?: number;
-}
+// interface Backtrack {
+//     inProgress: boolean; // backtracking currently in progress
+//     left?: number; // go left x turns, right x turns, etc... (not used)
+//     right?: number;
+//     up?: number;
+//     down?: number;
+// }
 
 // To create coordinate system -- unknown whether its ok to add to CellInfo instead
 interface MyCell {
@@ -47,9 +47,10 @@ class Stacker {
     private explored: MyCell[] | null = []; // list of all cells visited in journey/path, never removed (using set would probably be better lookup time if ever needed)
     private current: MyCell | null = null; // current x,y position on map
     private origin: MyCell = { x: 0, y: 0 }; // orogin cell of entire coordinate system
-    private backtrack: Backtrack = {
-        inProgress: false,
-    };
+    // private backtrack: Backtrack = {
+    //     inProgress: false,
+    // };
+    private backtrackInProgress = false; // if we are currently backtracking
 
     // using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
     // private staircaseTotal = Math.abs((8 - 1) * 8) / 2; // (not used to keep simple) total number of blocks required to build staircase
@@ -81,7 +82,7 @@ class Stacker {
             // );
             return this.traverseMap(cell);
         } else if (!this.towerLocation) {
-            if (this.backtrack.inProgress) {
+            if (this.backtrackInProgress) {
                 this.current = this.path.pop(); // should sync with cell
             } else {
                 this.current = this.toVisit.pop();
@@ -161,7 +162,7 @@ class Stacker {
             return Action.DROP; // First drop: placeholder for now to exit early, troll stays in place
         }
         if (canMove) {
-            this.backtrack.inProgress = false;
+            this.backtrackInProgress = false;
             return this.getNextAction();
         } else {
             // console.log('cant move: ' + this.current.x + ',' + this.current.y);
@@ -189,7 +190,7 @@ class Stacker {
 
     // Begin backtracking
     private backtrackAction(): Action {
-        this.backtrack.inProgress = true;
+        this.backtrackInProgress = true;
         // x and y direction to backtrack to:
         this.path.pop();
         const xDirection = this.path.slice(-1)[0].x - this.current.x;
