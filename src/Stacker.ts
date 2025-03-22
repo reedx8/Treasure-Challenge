@@ -1,14 +1,13 @@
 /*
-3 main algos to find:
+4 main algos to find:
 1. traversal algo (done)
-    - needs backtracking too (done)
     - save tower location (done)
-2. collect blocks algo (can just pop off path[] for now) 
-3. build staircase algo
+2. Traversal needs backtracking algo too (done)
+3. collect blocks algo (can just pop off path[] for now) (TODO)
+4. build staircase algo (TODO)
     - align ((h-1)(h))/2  blocks in total (where h = tower height)
 
-
-- Each run has several paths created -- path[] cleared each time troll at tower
+- Each run has several paths created -- path[] cleared each time troll at tower (TODO)
 - explored is a list of all explored cells in run, never to be reset in a single run. 
 - Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
 */
@@ -28,57 +27,48 @@ interface CellInfo {
 interface MyCell {
     x: number;
     y: number;
-    level?: number; // may not be needed
 }
 
 class Stacker {
-    private treasureFound = false; // if we have found the treasure on map (not used)
     private towerLocation: MyCell | null = null; // x,y location of tower on map
-    private holdingBlock = false; // if we are holding a block
+    private holdingBlock: boolean = false; // if we are holding a block
     private explored: MyCell[] | null = []; // list of all cells visited in journey/path, never removed (using set would probably be better lookup time if ever needed)
     private current: MyCell | null = null; // current x,y position on map
     private origin: MyCell = { x: 0, y: 0 }; // orogin cell of entire coordinate system
 
-    // using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
-    // private staircaseTotal = Math.abs((8 - 1) * 8) / 2; // (not used to keep simple) total number of blocks required to build staircase
-    private staircaseTotal = 3; // dummy value for now (to keep it simple)
-
-    // For BFS/DFS traversal and backtracking
+    // For BFS/DFS traversal and backtracking:
     private path: MyCell[] = []; // The path actually taken thus far for each journey/run (using set would probably be better lookup time if needed)
     private toVisit: MyCell[] = []; // list of cells to visit next
-    private backtrackInProgress = false; // if we are currently backtracking
+    private backtrackInProgress: boolean = false; // if we are currently backtracking
+    // Using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
+    // private staircaseTotal: number = Math.abs((8 - 1) * 8) / 2; // (not used) total number of blocks required to build staircase
 
     turn = (cell: CellInfo): Action => {
+        // pickup block along the way if you can
         if (
             cell.type === CellType.BLOCK &&
             !this.holdingBlock &&
-            !this.towerLocation // TODO: should be able to pick up block when tower is found too obv, but avoids never-ending pickup/drop loop at end for now
+            !this.towerLocation // TODO: should be able to pick up block when tower is found too obv., but avoids never-ending pickup/drop loop at end for now
         ) {
-            // Greedy pickup
             this.holdingBlock = true;
             console.log('PICKUP');
             return Action.PICKUP;
         }
 
         // Phase 1: Update position and traverse map for tower (backtrack if nec.).
-        if (this.current === null) {
+        if (!this.current) {
             // at beginning of run
             this.current = { ...this.origin };
             this.updatePath(this.current);
-            // console.log(
-            //     'current (begin): ' + this.current.x + ',' + this.current.y
-            // );
             return this.traverseMap(cell);
         } else if (!this.towerLocation) {
+            // update current position
             if (this.backtrackInProgress) {
                 this.current = this.path.pop(); // should sync with cell
             } else {
                 this.current = this.toVisit.pop();
-                // this.updatePath(this.current);
             }
             this.updatePath(this.current);
-            // console.log('current: ' + this.current.x + ',' + this.current.y);
-            // this.current = this.toVisit.pop(); // This wont work on its own as we want it when stuck/should backtrack and will continue pulling from toVisit at those points
             return this.traverseMap(cell);
         } else {
             // Phase 2: Tower located
@@ -94,86 +84,54 @@ class Stacker {
                 this.holdingBlock = false;
             }
 
-            // TODO
-            // this.path = []; // reset path
-            // this.toVisit = []; // reset toVisit
-            // return this.traverseMap(cell); // traverse map again
-
             // TODO: needs to drop only under certain conditions
             return Action.DROP; // 2nd drop: placeholder for now (stays in place while dropping too)
         }
 
-        // Phase 3: Collect blocks
+        // Phase 3: Collect blocks (TODO)
 
-        // Phase 4: Build staircase to treasure
+        // Phase 4: Build staircase to treasure (TODO)
     };
 
     // Traverse map by adding to toVisit (DFS?)
     private traverseMap(cell: CellInfo): Action {
-        // let traversedEntireMap = 4;
         let canMove = false;
 
-        if (!this.towerLocation) {
-            // only find tower once
-            this.findTower(cell.up, 0, -1);
-            this.findTower(cell.left, -1, 0);
-            this.findTower(cell.down, 0, 1);
-            this.findTower(cell.right, 1, 0);
-        }
+        const neighbors = [
+            { dir: cell.up, dx: 0, dy: -1 },
+            { dir: cell.left, dx: -1, dy: 0 },
+            { dir: cell.down, dx: 0, dy: 1 },
+            { dir: cell.right, dx: 1, dy: 0 },
+        ];
 
-        // Add to toVisit stack if valid cell in order to traverse map
-        if (this.isValidCell(cell, cell.up, 0, -1)) {
-            this.toVisit.push({ x: this.current.x, y: this.current.y - 1 });
-            canMove = true;
-            // console.log('up');
-        }
-        if (this.isValidCell(cell, cell.left, -1, 0)) {
-            this.toVisit.push({ x: this.current.x - 1, y: this.current.y });
-            canMove = true;
-            // console.log('left');
-        }
-        if (this.isValidCell(cell, cell.down, 0, 1)) {
-            this.toVisit.push({ x: this.current.x, y: this.current.y + 1 });
-            canMove = true;
-            // console.log('down');
-        }
-        if (this.isValidCell(cell, cell.right, 1, 0)) {
-            this.toVisit.push({ x: this.current.x + 1, y: this.current.y });
-            canMove = true;
-            // console.log('right');
+        // Add valid neighbors to toVisit stack for traversal, check for tower too
+        for (const n of neighbors) {
+            if (this.checkNeighbors(cell, n.dir, n.dx, n.dy)) {
+                this.toVisit.push({
+                    x: this.current.x + n.dx,
+                    y: this.current.y + n.dy,
+                });
+                canMove = true;
+            }
         }
 
         if (this.towerLocation) {
-            // Tower lcated somewhere in cell's immed. neighboring cells...
+            // Tower located somewhere in cell's immed. neighboring cells...
             this.holdingBlock = false;
             console.log('DROP');
             return Action.DROP; // First drop: placeholder for now to exit early, troll stays in place
         }
+
         if (canMove) {
             this.backtrackInProgress = false;
             return this.getNextAction();
         } else {
-            // console.log('cant move: ' + this.current.x + ',' + this.current.y);
             if (this.current.x === 0 && this.current.y === 0) {
-                console.log('End of journey/run');
+                console.log(`Reached run's end without finding tower`);
                 return Action.DROP; // placeholder for now, troll stays in place
             }
+            // else we just cant move to valid cells, so backtrack
             return this.backtrackAction();
-        }
-        // return this.getNextAction(); // DFS due to pop()?
-    }
-
-    // Check if tower is found and update its location
-    private findTower(
-        direction: { type: CellType; level: number },
-        dx: number,
-        dy: number
-    ) {
-        if (direction.level === 8 && !this.towerLocation) {
-            this.towerLocation = {
-                x: this.current.x + dx,
-                y: this.current.y + dy,
-            };
         }
     }
 
@@ -185,35 +143,21 @@ class Stacker {
         const xDirection = this.path.slice(-1)[0].x - this.current.x;
         const yDirection = this.path.slice(-1)[0].y - this.current.y;
 
-        // console.log(
-        //     'prev path: ' +
-        //         this.path.slice(-1)[0].x +
-        //         ',' +
-        //         this.path.slice(-1)[0].y
-        // );
-        // console.log('current (bt): ' + this.current.x + ',' + this.current.y);
-        // console.log('xDirection: ' + xDirection);
-        // console.log('yDirection: ' + yDirection);
-
         if (yDirection < 0) {
-            // this.backtrack.up = Math.abs(yDirection);
             console.log('go back ^');
             return Action.UP;
         } else if (yDirection > 0) {
-            // this.backtrack.down = yDirection;
             console.log('go back v');
             return Action.DOWN;
         } else if (xDirection < 0) {
-            // this.backtrack.left = xDirection;
             console.log('go back <-');
             return Action.LEFT;
         } else if (xDirection > 0) {
-            // this.backtrack.right = xDirection;
             console.log('go back ->');
             return Action.RIGHT;
         } else {
             console.log('nothing to backtrack to');
-            // TODO: should return an action here
+            return Action.DROP; // placeholder for now, troll stays in place
         }
     }
 
@@ -235,10 +179,9 @@ class Stacker {
             // down: +1y
             return Action.DOWN;
         } else {
-            // TODO: x=0 and y=0 when visited all cells on map
-            // this.toVisit.pop();
-            // this.doneVisiting = true;
-            // return Action.PICKUP; // placeholder for now , stays in place
+            // When x=0 and y=0 when visited all cells on map
+            console.log('no next action');
+            return Action.DROP; // placeholder for now, troll stays in place
         }
     }
 
@@ -252,11 +195,11 @@ class Stacker {
         if (!this.path.some((e) => e.x === position.x && e.y === position.y)) {
             this.path.push({ ...position });
         }
-        // console.log('current: ' + this.current.x + ',' + this.current.y);
     }
 
-    // Find which neighbors are valid to move to (if not wall, not already visited in path, and 1 level away)
-    private isValidCell(
+    // Find which neighbors are valid to move to (not wall, not visited, and 1 level away)
+    // as well as if any are a tower as well
+    private checkNeighbors(
         cell: CellInfo, // current cell
         direction: { type: CellType; level: number },
         dx: number,
@@ -265,21 +208,35 @@ class Stacker {
         // current should === cell
         if (
             direction.type !== CellType.WALL &&
-            Math.abs(direction.level - cell.level) <= 1 &&
             !this.path.some(
-                (v) =>
-                    v.x === this.current.x + dx && v.y === this.current.y + dy
+                (p) =>
+                    p.x === this.current.x + dx && p.y === this.current.y + dy
             ) &&
             !this.explored.some(
                 (e) =>
                     e.x === this.current.x + dx && e.y === this.current.y + dy
             )
         ) {
-            return true;
+            if (!this.towerLocation) this.findTower(direction, dx, dy);
+            if (Math.abs(direction.level - cell.level) <= 1) return true;
         }
 
         return false;
         // TODO: what about for CellType.GOLD?
+    }
+
+    // Check if tower is found and update its location
+    private findTower(
+        direction: { type: CellType; level: number },
+        dx: number,
+        dy: number
+    ): void {
+        if (direction.level === 8 && !this.towerLocation) {
+            this.towerLocation = {
+                x: this.current.x + dx,
+                y: this.current.y + dy,
+            };
+        }
     }
 }
 
