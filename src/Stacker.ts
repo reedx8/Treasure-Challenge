@@ -1,6 +1,6 @@
 /*
-Program only capable of dropping a single block near found tower.
-Yet to collect additional blocks and build staircase.
+Program only capable of dropping two blocks near found tower.
+Yet to collect/drop blocks appropriately (ie build staircase).
 Program will console.log(): backtrack direction (if needed), pickup/drop, and tower location
 
 4 main algos to find:
@@ -11,8 +11,8 @@ Program will console.log(): backtrack direction (if needed), pickup/drop, and to
     - only pickup if not staircase cell
     - total blocks = collect ((h-1)(h))/2  blocks in total (where h = tower height)
 4. build staircase algo (TODO)
-    - Initial: build until staircase.length = 2 and 2 block dropped
-    - Add block to end of staircase when staircase full (staircase[0] = staircase.length), repeat till total blocks collected
+    - Initial staircase build until staircase.length = 2 and two 1 block cells
+    - Then, add block to end of staircase when staircase full (staircase[0] = staircase.length), repeat till total blocks collected
 
 - Each run has several paths created -- path[] cleared each time troll at tower (TODO)
 - explored is a 2nd list of all explored cells in run.
@@ -30,13 +30,16 @@ interface CellInfo {
     level: number; // the level of the current cell
 }
 
-// To create coordinate system. Unique identification of each cell. Unknown whether its ok to add to CellInfo instead
+// To create coordinate system (TODO: Refactor. x,y actually only needed for unique identification of each cell).
+// Unknown whether its ok to add to CellInfo instead
 interface MyCell {
     x: number;
     y: number;
-    nextAction: Action | null;
-    level?: number;
+    nextAction: Action | null; // needed for backtracking
+    level?: number; // needed for staircase
+    type?: CellType; // needed for staircase
 }
+
 enum Phase {
     FIND_TOWER = 'Find Tower Phase',
     COLLECT_BLOCKS = 'Collect Blocks Phase',
@@ -47,7 +50,6 @@ class Stacker {
     private towerLocation: MyCell | null = null; // x,y location of tower on map
     private holdingBlock: boolean = false; // if we are holding a block
     private current: MyCell | null = null; // current x,y position/cell on map
-    private prevCell: MyCell | null = null; // previous cell
     private origin: MyCell = { x: 0, y: 0, nextAction: null }; // orogin cell of entire coordinate system (ie start)
     private blockLocation: MyCell | null = null; // x,y location of block to pickup on map
     private phase: Phase = Phase.FIND_TOWER; // current phase
@@ -59,6 +61,7 @@ class Stacker {
     private backtrackInProgress: boolean = false; // if we are currently backtracking
     private returningToTower: boolean = false; // if we are currently returning to tower in phase 2
     private staircase: MyCell[] | null = []; // list of cells to build staircase on
+
     // Using the triangular number formula: (h-1)h/2 (8 hardcoded for now since only ever seen 8 level towers. h = tower height)
     // private staircaseTotal: number = Math.abs((8 - 1) * 8) / 2; // (not used) total number of blocks required to build staircase
 
@@ -90,7 +93,6 @@ class Stacker {
             if (!this.blockLocation) {
                 // ...youve just found tower and dropped block from traverseMap()
                 if (this.phase === Phase.FIND_TOWER) {
-                    // Begin collecting blocks phase
                     this.current = { ...this.toVisit.pop() };
                     this.phase = Phase.COLLECT_BLOCKS;
                     this.clearState();
@@ -103,7 +105,7 @@ class Stacker {
 
                 return this.traverseMap(cell);
             } else {
-                // Block Found -- Pickup, then drop block wehn back at tower
+                // Block Found -- Pickup, then drop block when back at tower
                 if (!this.returningToTower && cell.type === CellType.BLOCK) {
                     // traverse back to tower via this.path, but not before collecting block
                     this.toVisit = [];
@@ -123,99 +125,22 @@ class Stacker {
                     this.path.push(this.current);
                     this.explored.push(this.current);
 
+                    // TODO: Should dop conditionally (buildStaircase())
                     return Action.DROP;
                 } else {
-                    // return to tower
+                    // return to tower via path taken (this.path)
                     return this.reverseDirection(this.path.pop().nextAction);
-                    // return this.returnToTower();
                 }
             }
-
-            ////////////////////////////////////////////////////////////////////////////////////
-            // console.log(
-            //     'STOP | tower found: ' +
-            //         this.towerLocation.x +
-            //         ',' +
-            //         this.towerLocation.y
-            // );
-
-            // if (this.holdingBlock) {
-            //     console.log('DROP');
-            //     this.holdingBlock = false;
-            // }
-
-            // // TODO: needs to drop only under certain conditions
-            // return Action.DROP; // 2nd drop: placeholder for now (stays in place while dropping too)
         }
     };
-    private buildStaircase(cell: CellInfo, current: MyCell): Action {
-        if (this.staircase.length < 2) {
-            // build initial staircase (two 1 block cells)
-            if (cell.type === CellType.BLOCK) {
-                return this.reverseDirection(this.path.pop().nextAction);
-                // return this.reverseDirection(current.nextAction);
-            }
-            this.staircase.push({ ...current, level: 1 });
-            console.log('STAIRCASE: add block');
-            this.holdingBlock = false;
-            this.blockLocation = null;
-            return Action.DROP;
-        }
 
-        // else drop at end of staircase when staircase full
-        if (
-            this.staircase[0].level === this.staircase.length &&
-            this.path.length > 0
-        ) {
-            if (cell.type === CellType.BLOCK) {
-                // cell == curent?
-                this.staircase.push({ ...current, level: 1 });
-                console.log('STAIRCASE: add block');
-                this.holdingBlock = false;
-                this.blockLocation = null;
-                return Action.DROP;
-            } else {
-                this.current = this.path.pop();
-                return this.reverseDirection(this.current.nextAction);
-            }
-        }
-
-        // else drop at top of staircase
-        this.holdingBlock = false;
-        this.blockLocation = null;
-        this.path.push(this.current);
-        this.explored.push(this.current);
-
-        this.staircase.push({ ...current, level: 1 });
-        console.log('STAIRCASE: add block');
-        return Action.DROP;
-    }
-
-    // using new nextAction property to backtrack this time instead of backtrackAction() (TODO: refactor backtrackAction to use this new property instead, simpler)
+    // using new nextAction property to backtrack this time instead of backtrackAction() (TODO: refactor backtrackAction() to use this new property instead, simpler)
     private reverseDirection(direction: Action): Action {
         if (direction === Action.UP) return Action.DOWN;
         if (direction === Action.DOWN) return Action.UP;
         if (direction === Action.LEFT) return Action.RIGHT;
         if (direction === Action.RIGHT) return Action.LEFT;
-    }
-
-    // using new nextAction property to backtrack this time instead of backtrackAction() (TODO: refactor backtrackAction to use this new property instead, simpler)
-    private returnToTower(): Action {
-        const prevCell = this.path.pop();
-
-        if (prevCell.nextAction === Action.UP) {
-            console.log('go back v');
-            return Action.DOWN;
-        } else if (prevCell.nextAction === Action.DOWN) {
-            console.log('go back ^');
-            return Action.UP;
-        } else if (prevCell.nextAction === Action.LEFT) {
-            console.log('go back ->');
-            return Action.RIGHT;
-        } else if (prevCell.nextAction === Action.RIGHT) {
-            console.log('go back <-');
-            return Action.LEFT;
-        }
     }
 
     // Traverse map by adding to toVisit, & current is always updated to last element of toVisit
@@ -244,8 +169,8 @@ class Stacker {
         // Perform actions depending on current phase
         if (this.towerLocation && this.phase === Phase.FIND_TOWER) {
             // Tower located somewhere in cell's immed. neighboring cells...
-            this.holdingBlock = false;
             // console.log('DROP: Tower found, end FIND_TOWER phase');
+            this.holdingBlock = false;
             return Action.DROP; // First drop: placeholder for now to exit early, troll stays in place
         }
         if (this.blockLocation && this.phase === Phase.COLLECT_BLOCKS) {
@@ -297,7 +222,7 @@ class Stacker {
         }
     }
 
-    // Derives next Action based on our coordinates (could remove this.origin since always 0):
+    // Derives next Action based on our coordinates (TODO: Refactor. 1. use direction only instead, and 2.could remove this.origin since always 0):
     private getNextAction(
         nextCell: MyCell = this.toVisit.slice(-1)[0]
     ): Action {
@@ -339,16 +264,16 @@ class Stacker {
         }
     }
 
+    // Updates main state variables
     private updateState(prevPosition: MyCell, currentPhase: Phase): void {
         this.phase = currentPhase;
-        this.prevCell = { ...prevPosition }; // TODO: may not be needed due to nextAction property
+        // this.prevCell = { ...prevPosition }; // TODO: may not be needed due to nextAction property
 
         // update current cell since weve now moved ahead
         this.path.slice(-1)[0].nextAction = prevPosition.nextAction;
         if (this.backtrackInProgress) {
             this.current = this.path.pop(); // should sync with cell
         } else {
-            // this.path.slice(-1)[0].nextAction = this.current.nextAction;
             this.current = this.toVisit.pop();
         }
 
@@ -369,8 +294,8 @@ class Stacker {
         }
     }
 
+    // Clears main state variables
     private clearState(): void {
-        this.prevCell = null;
         this.path = [];
         this.toVisit = [];
         this.backtrackInProgress = false;
@@ -422,6 +347,7 @@ class Stacker {
         }
     }
 
+    // Check if block is found and updates its location
     private findBlock(
         direction: { type: CellType; level: number },
         dx: number,
@@ -434,6 +360,56 @@ class Stacker {
                 nextAction: null,
             };
         }
+    }
+
+    // TODO: build staircase algo. Will need to run findBlock() only when block not in staircase (checkNeighbors())
+    private buildStaircase(cell: CellInfo, current: MyCell): Action {
+        if (this.staircase.length < 2) {
+            // build initial staircase (two 1 block cells)
+            if (cell.type === CellType.BLOCK) {
+                return this.reverseDirection(this.path.pop().nextAction);
+                // return this.reverseDirection(current.nextAction);
+            }
+            this.staircase.push({ ...current, level: 1, type: CellType.BLOCK });
+            console.log('STAIRCASE: add block');
+            this.holdingBlock = false;
+            this.blockLocation = null;
+            return Action.DROP;
+        }
+
+        // else drop at end of staircase when staircase full
+        if (this.staircase[0].level === this.staircase.length) {
+            if (this.path.slice(-1)[0].type === CellType.BLOCK) {
+                // cell == curent?
+                this.staircase.push({
+                    ...current,
+                    level: 1,
+                    type: CellType.BLOCK,
+                });
+                console.log('STAIRCASE: add block');
+                this.holdingBlock = false;
+                this.blockLocation = null;
+                this.returningToTower = false;
+                this.toVisit = [];
+                this.explored = [];
+                this.path = [];
+                this.path.push(this.current);
+                this.explored.push(this.current);
+                return Action.DROP;
+            }
+            this.current = this.path.pop();
+            return this.reverseDirection(this.current.nextAction);
+        }
+
+        // else drop at top of staircase
+        this.holdingBlock = false;
+        this.blockLocation = null;
+        this.path.push(this.current);
+        this.explored.push(this.current);
+
+        this.staircase.push({ ...current, level: 1, type: CellType.BLOCK });
+        console.log('STAIRCASE: add block');
+        return Action.DROP;
     }
 }
 
