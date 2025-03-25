@@ -122,6 +122,8 @@ class Stacker {
                     console.log('DROP');
                     this.holdingBlock = false;
                     this.blockLocation = null;
+                    this.returningToTower = false;
+
                     this.path.push(this.current);
                     this.explored.push(this.current);
 
@@ -169,13 +171,11 @@ class Stacker {
         // Perform actions depending on current phase
         if (this.towerLocation && this.phase === Phase.FIND_TOWER) {
             // Tower located somewhere in cell's immed. neighboring cells...
-            // console.log('DROP: Tower found, end FIND_TOWER phase');
             this.holdingBlock = false;
             return Action.DROP; // First drop: placeholder for now to exit early, troll stays in place
         }
         if (this.blockLocation && this.phase === Phase.COLLECT_BLOCKS) {
-            // reroute to block's position IOT pickup
-            // console.log('traverseMap: route to block cell');
+            // route to block's position IOT pickup
             return this.getNextAction(this.blockLocation);
         }
 
@@ -196,7 +196,14 @@ class Stacker {
     private backtrackAction(): Action {
         this.backtrackInProgress = true;
         // x and y direction to backtrack to:
-        this.path.pop();
+        if (this.path.length > 0) {
+            this.path.pop();
+        }
+
+        if (this.path.length === 0) {
+            return Action.DROP; // placeholder for now, troll stays in place at end of run here
+        }
+
         const xDirection = this.path.slice(-1)[0].x - this.current.x;
         const yDirection = this.path.slice(-1)[0].y - this.current.y;
 
@@ -270,10 +277,13 @@ class Stacker {
         // this.prevCell = { ...prevPosition }; // TODO: may not be needed due to nextAction property
 
         // update current cell since weve now moved ahead
-        this.path.slice(-1)[0].nextAction = prevPosition.nextAction;
-        if (this.backtrackInProgress) {
+        if (this.path.length > 0)
+            this.path.slice(-1)[0].nextAction = prevPosition.nextAction;
+
+        if (this.backtrackInProgress && this.path.length > 0) {
             this.current = this.path.pop(); // should sync with cell
-        } else {
+        } else if (this.toVisit.length > 0) {
+            // console.log('toVisit: ', this.toVisit);
             this.current = this.toVisit.pop();
         }
 
